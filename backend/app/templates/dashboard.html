@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - OptimaPricer{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
+            <p class="text-slate-500 mt-1">Quick overview of your pricing strategy</p>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <a href="{{ url_for('main.products') }}" 
+            class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow group">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                    <svg class="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-900">Products</div>
+                    <div class="text-sm text-slate-600">Manage products & pricing</div>
+                </div>
+            </div>
+        </a>
+        <a href="{{ url_for('main.settings') }}" 
+            class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow group">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
+                    <svg class="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-900">Settings</div>
+                    <div class="text-sm text-slate-600">Configure your account</div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="metricsContainer">
+        <!-- Metrics will be loaded here -->
+    </div>
+
+    <!-- Recommendations -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-slate-900">Price Recommendations</h2>
+            <a href="{{ url_for('main.products') }}" class="text-sm text-emerald-700 hover:text-emerald-800 font-medium">
+                View All →
+            </a>
+        </div>
+        <div id="recommendationsContainer">
+            <!-- Recommendations will be loaded here -->
+        </div>
+    </div>
+</div>
+<script>
+// Track if dashboard is visible to refresh recommendations periodically
+let dashboardRefreshInterval = null;
+
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        const response = await fetch('/api/dashboard', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch dashboard data');
+        }
+        
+        const data = await response.json();
+        const metrics = data.metrics;
+        
+        // Set up periodic refresh of recommendations (every 10 seconds, only when page is visible)
+        if (dashboardRefreshInterval) {
+            clearInterval(dashboardRefreshInterval);
+        }
+        dashboardRefreshInterval = setInterval(() => {
+            if (!document.hidden) {
+                loadRecommendations();
+            }
+        }, 10000);
+        
+        // Also refresh when page becomes visible
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                loadRecommendations();
+            }
+        });
+        
+        // Render simplified metrics
+        document.getElementById('metricsContainer').innerHTML = `
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-slate-100 rounded-lg">
+                        <svg class="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-slate-600">Total Products</div>
+                        <div class="text-2xl font-bold text-slate-900">${metrics.totalProducts}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-emerald-100 rounded-lg">
+                        <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-slate-600">Average Margin</div>
+                        <div class="text-2xl font-bold text-slate-900">${metrics.avgMargin}%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-emerald-100 rounded-lg">
+                        <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="text-sm text-slate-600">Pending Recommendations</div>
+                        <div class="text-2xl font-bold text-slate-900">${metrics.pendingRecommendations}</div>
+                        ${metrics.pendingRecommendations > 0 ? 
+                            `<div class="text-xs text-emerald-600 mt-1">$${metrics.potentialUplift.toLocaleString()} potential revenue</div>` : 
+                            `<div class="text-xs text-slate-500 mt-1">Ready to review</div>`
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Load recommendations (redirects to products page)
+        await loadRecommendations();
+        
+    } catch (error) {
+        if (window.logError) window.logError('Error loading dashboard:', error);
+        document.getElementById('metricsContainer').innerHTML = `
+            <div class="col-span-3 bg-red-50 rounded-lg border border-red-200 p-6 text-center">
+                <p class="text-red-700">Error loading dashboard data. Please refresh the page.</p>
+            </div>
+        `;
+    }
+}
+
+// Load recommendations
+async function loadRecommendations() {
+    try {
+        const response = await fetch('/api/recommendations?status=pending', {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch recommendations');
+        }
+        
+        const recommendations = await response.json();
+        const container = document.getElementById('recommendationsContainer');
+        
+        // Filter out any non-pending recommendations (safety check)
+        const pendingOnly = recommendations.filter(rec => rec.status === 'pending');
+        
+        if (pendingOnly.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <svg class="w-12 h-12 mx-auto text-slate-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <p class="text-slate-600 mb-2">No pending recommendations</p>
+                    <p class="text-sm text-slate-600">Scan your products to get price recommendations</p>
+                    <a href="/products" class="inline-block mt-4 text-sm text-emerald-700 hover:text-emerald-800 font-medium">
+                        Go to Products →
+                    </a>
+                </div>
+            `;
+            return;
+        }
+        
+        // Show top 3 recommendations
+        const topRecommendations = pendingOnly.slice(0, 3);
+        
+        container.innerHTML = topRecommendations.map(rec => {
+            const product = rec.product;
+            const priceDiff = rec.suggestedPrice - product.currentPrice;
+            const priceDiffPercent = ((priceDiff / product.currentPrice) * 100).toFixed(1);
+            const isIncrease = priceDiff > 0;
+            
+            return `
+                <div class="border-b border-slate-200 last:border-0 py-4 first:pt-0 last:pb-0">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-slate-900">${product.name}</h3>
+                            <p class="text-sm text-slate-500 mt-1">${product.sku}</p>
+                            <div class="flex items-center gap-4 mt-3">
+                                <div>
+                                    <span class="text-xs text-slate-600">Current</span>
+                                    <div class="text-sm font-medium text-slate-700">$${product.currentPrice.toFixed(2)}</div>
+                                </div>
+                                <div>
+                                    <span class="text-xs text-slate-600">Suggested</span>
+                                    <div class="text-sm font-medium ${isIncrease ? 'text-emerald-600' : 'text-amber-600'}">
+                                        $${rec.suggestedPrice.toFixed(2)}
+                                        <span class="text-xs ml-1">(${isIncrease ? '+' : ''}${priceDiffPercent}%)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="/products" class="text-sm text-emerald-700 hover:text-emerald-800 font-medium whitespace-nowrap">
+                            View →
+                        </a>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        if (pendingOnly.length > 3) {
+            container.innerHTML += `
+                <div class="pt-4 mt-4 border-t border-slate-200 text-center">
+                    <a href="/products" class="text-sm text-emerald-700 hover:text-emerald-800 font-medium">
+                        View all ${pendingOnly.length} recommendations →
+                    </a>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        if (window.logError) window.logError('Error loading recommendations:', error);
+        document.getElementById('recommendationsContainer').innerHTML = `
+            <div class="text-center py-8 text-slate-500">
+                <p>Error loading recommendations</p>
+            </div>
+        `;
+    }
+}
+
+loadDashboard();
+
+// Clean up interval when leaving the page
+window.addEventListener('beforeunload', () => {
+    if (dashboardRefreshInterval) {
+        clearInterval(dashboardRefreshInterval);
+    }
+});
+</script>
+{% endblock %}

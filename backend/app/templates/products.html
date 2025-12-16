@@ -1,0 +1,1704 @@
+{% extends "base.html" %}
+
+{% block title %}Products - OptimaPricer{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Products</h1>
+            <p class="text-slate-500 mt-1">Manage your product catalog and pricing</p>
+        </div>
+        <button onclick="openAddProductModal()"
+            class="bg-emerald-900 hover:bg-emerald-800 text-white font-medium py-2.5 px-5 rounded-lg inline-flex items-center gap-2 shadow-sm hover:shadow transition-shadow">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add Product
+        </button>
+    </div>
+
+    <!-- Products Grid -->
+    <div id="productsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Products will be loaded here -->
+    </div>
+</div>
+
+<!-- Add/Edit Product Modal -->
+<div id="addProductModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeAddProductModal()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+            <h3 id="productModalTitle" class="text-xl font-bold text-slate-900">Add Product</h3>
+            <button onclick="closeAddProductModal()" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="addProductForm" class="p-6 space-y-5">
+            <input type="hidden" id="editProductId" name="productId" value="">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Store</label>
+                <select id="storeId" name="storeId" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                    <option value="">Select a store</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Product Name</label>
+                <input type="text" name="name" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+            <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">SKU</label>
+                    <input type="text" name="sku" required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+            </div>
+            <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Category</label>
+                    <input type="text" name="category" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" value="Other">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Cost Price</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                        <input type="number" step="0.01" name="costPrice" required class="w-full pl-7 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Current Price</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                        <input type="number" step="0.01" name="currentPrice" required class="w-full pl-7 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Sales Velocity <span class="text-slate-400 font-normal">(units/week)</span></label>
+                <input type="number" step="0.1" name="salesVelocity" class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" value="0">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeAddProductModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-4 rounded-lg transition">
+                    Cancel
+                </button>
+                <button type="submit" class="flex-1 bg-emerald-900 hover:bg-emerald-800 text-white font-medium py-2.5 px-4 rounded-lg transition">
+                    Add Product
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function loadProducts() {
+    try {
+        // Track which analytics tabs are currently open before reloading
+        const openAnalytics = new Set();
+        document.querySelectorAll('[id^="analytics-"]').forEach(analyticsDiv => {
+            if (!analyticsDiv.classList.contains('hidden')) {
+                const productId = analyticsDiv.id.replace('analytics-', '');
+                openAnalytics.add(productId);
+            }
+        });
+        
+        const response = await fetch('/api/products', { credentials: 'include' });
+        const products = await response.json();
+        
+        const container = document.getElementById('productsContainer');
+        
+        if (products.length === 0) {
+            container.innerHTML = `
+                <div class="col-span-full">
+                    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-12 text-center">
+                        <svg class="w-16 h-16 mx-auto text-slate-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                        <h2 class="text-lg font-semibold text-slate-900 mb-2">No products yet</h2>
+                        <p class="text-slate-600 mb-6">Get started by adding your first product to track pricing</p>
+                        <button onclick="openAddProductModal()" class="bg-emerald-900 hover:bg-emerald-800 text-white font-medium py-2.5 px-5 rounded-lg inline-flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            Add Your First Product
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        // Load products with their recommendations
+        const productsWithRecs = await Promise.all(products.map(async (product) => {
+            try {
+                const recResponse = await fetch(`/api/recommendations?productId=${product.id}&status=pending`, { credentials: 'include' });
+                const recommendations = await recResponse.json();
+                // Only use pending recommendations, filter out any applied/rejected ones
+                const pendingRec = recommendations.find(rec => rec.status === 'pending') || null;
+                return { ...product, recommendation: pendingRec };
+            } catch (error) {
+                return { ...product, recommendation: null };
+            }
+        }));
+        
+        container.innerHTML = productsWithRecs.map(product => {
+            const margin = ((product.currentPrice - product.costPrice) / product.currentPrice * 100).toFixed(1);
+            const marginColor = parseFloat(margin) > 30 ? 'text-emerald-600' : parseFloat(margin) > 20 ? 'text-amber-600' : 'text-red-600';
+            const rec = product.recommendation;
+            const hasRecommendation = rec && rec.status === 'pending';
+            
+            // Use market average from recommendation if available, otherwise use competitor price
+            const marketPrice = (hasRecommendation && rec.marketAveragePrice) ? rec.marketAveragePrice : (product.competitorPrice || null);
+            const hasMarketPrice = marketPrice && marketPrice > 0;
+            const priceDiff = hasMarketPrice ? marketPrice - product.currentPrice : 0;
+            const priceDiffPercent = hasMarketPrice ? ((priceDiff / product.currentPrice) * 100).toFixed(1) : 0;
+            
+            // Calculate time since last scan
+            let lastScanText = '';
+            if (product.lastScannedAt) {
+                const lastScan = new Date(product.lastScannedAt);
+                const now = new Date();
+                const hoursAgo = Math.floor((now - lastScan) / (1000 * 60 * 60));
+                const daysAgo = Math.floor(hoursAgo / 24);
+                
+                if (hoursAgo < 1) {
+                    lastScanText = 'Scanned less than an hour ago';
+                } else if (hoursAgo < 24) {
+                    lastScanText = `Scanned ${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago`;
+                } else {
+                    lastScanText = `Scanned ${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+                }
+            }
+            
+            return `
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow" data-product-id="${product.id}">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <h2 class="font-semibold text-slate-900 mb-1">${product.name}</h2>
+                            <div class="flex items-center gap-2 text-sm text-slate-600">
+                                <span>${product.sku}</span>
+                                <span>•</span>
+                                <span>${product.category}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="editProduct('${product.id}')" class="text-slate-400 hover:text-emerald-600 transition-colors p-1" title="Edit product">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                            <button onclick="deleteProduct('${product.id}')" class="text-slate-400 hover:text-red-600 transition-colors p-1" title="Delete product">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3 mb-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-slate-600">Current Price</span>
+                            <span class="text-lg font-semibold text-slate-900">$${product.currentPrice.toFixed(2)}</span>
+                        </div>
+                        ${hasMarketPrice ? `
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-slate-600">Market Average${hasRecommendation && rec.marketPriceCount ? ` (${rec.marketPriceCount} sources)` : ''}</span>
+                                <span class="text-sm font-medium ${priceDiff > 0 ? 'text-emerald-600' : 'text-amber-600'}">
+                                    $${marketPrice.toFixed(2)}
+                                    ${priceDiff !== 0 ? `<span class="text-xs ml-1">(${priceDiff > 0 ? '+' : ''}${priceDiffPercent}%)</span>` : ''}
+                                </span>
+                            </div>
+                        ` : `
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-slate-600">Market Average</span>
+                                <span class="text-sm text-slate-500">Not scanned</span>
+                            </div>
+                        `}
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span class="text-sm text-slate-600">Margin</span>
+                            <span class="text-sm font-semibold ${marginColor}">${margin}%</span>
+                        </div>
+                    </div>
+                    
+                    ${hasRecommendation ? `
+                        <div class="recommendation-section mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                    </svg>
+                                    <span class="text-sm font-semibold text-emerald-900">Price Recommendation</span>
+                                </div>
+                            </div>
+                            <div class="space-y-2 mb-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-slate-600">Suggested Price</span>
+                                    <span class="text-lg font-bold ${rec.suggestedPrice > product.currentPrice ? 'text-emerald-600' : 'text-amber-600'}">
+                                        $${rec.suggestedPrice.toFixed(2)}
+                                    </span>
+                                </div>
+                                <div class="text-xs text-slate-600 mt-2">${rec.rationale}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="applyRecommendation('${rec.id}', ${rec.suggestedPrice}, '${product.id}')" 
+                                    class="flex-1 bg-emerald-900 hover:bg-emerald-800 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors">
+                                    Apply
+                                </button>
+                                <button onclick="rejectRecommendation('${rec.id}', '${product.id}')" 
+                                    class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors">
+                                    Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <button id="scan-btn-${product.id}" onclick="scanPrices('${product.id}')" 
+                        class="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <span class="scan-text">${hasMarketPrice ? 'Scan Prices Again' : 'Scan Prices'}</span>
+                    </button>
+                    ${lastScanText ? `
+                        <p class="text-xs text-slate-500 text-center mt-2">${lastScanText}</p>
+                    ` : ''}
+                    
+                    ${(hasMarketPrice || product.lastScannedAt) ? `
+                        <button onclick="togglePriceAnalytics('${product.id}')" 
+                            class="w-full mt-3 text-sm text-emerald-700 hover:text-emerald-800 font-medium py-2 px-4 rounded-lg border border-emerald-200 hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <span id="analytics-toggle-${product.id}">View Price Analytics</span>
+                        </button>
+                        <div id="analytics-${product.id}" class="hidden mt-4 pt-4 border-t border-slate-200">
+                            <div class="space-y-4">
+                                <div>
+                                    <h4 class="text-sm font-semibold text-slate-900 mb-2">Price Trend</h4>
+                                    <canvas id="trend-chart-${product.id}" class="w-full" style="max-height: 200px;"></canvas>
+                                </div>
+                                <div>
+                                    <h4 class="text-sm font-semibold text-slate-900 mb-2">Market Price Distribution</h4>
+                                    <canvas id="distribution-chart-${product.id}" class="w-full" style="max-height: 150px;"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+        
+        // Restore open analytics tabs and reload their data
+        if (openAnalytics.size > 0) {
+            // Wait for DOM to update and ensure Chart.js is available
+            setTimeout(async () => {
+                // Check if Chart.js is available
+                if (typeof Chart === 'undefined') {
+                    if (window.logError) window.logError('Chart.js not available when restoring analytics');
+                    return;
+                }
+                
+                for (const productId of openAnalytics) {
+                    const analyticsDiv = document.getElementById(`analytics-${productId}`);
+                    const toggleText = document.getElementById(`analytics-toggle-${productId}`);
+                    
+                    if (analyticsDiv && toggleText) {
+                        // Show analytics
+                        analyticsDiv.classList.remove('hidden');
+                        toggleText.textContent = 'Hide Price Analytics';
+                        
+                        // Clear any existing chart instances
+                        if (chartInstances[productId]) {
+                            try {
+                                if (chartInstances[productId].trend) {
+                                    chartInstances[productId].trend.destroy();
+                                }
+                                if (chartInstances[productId].distribution) {
+                                    chartInstances[productId].distribution.destroy();
+                                }
+                                if (chartInstances[productId].elasticity) {
+                                    chartInstances[productId].elasticity.destroy();
+                                }
+                            } catch (e) {
+                                if (window.logError) window.logError('Error destroying charts:', e);
+                            }
+                            delete chartInstances[productId];
+                        }
+                        
+                        // Also clear elasticity chart if it exists
+                        if (chartInstances[`elasticity-${productId}`]) {
+                            try {
+                                chartInstances[`elasticity-${productId}`].destroy();
+                            } catch (e) {
+                                if (window.logError) window.logError('Error destroying elasticity chart:', e);
+                            }
+                            delete chartInstances[`elasticity-${productId}`];
+                        }
+                        
+                        // Reload analytics with fresh data
+                        try {
+                            await loadPriceAnalytics(productId);
+                        } catch (error) {
+                            if (window.logError) window.logError('Error loading analytics after scan:', error);
+                            // Show error message in analytics div
+                            analyticsDiv.innerHTML = `
+                                <div class="text-center py-4 text-sm text-red-600">
+                                    <p>Error loading analytics: ${error.message || 'Unknown error'}</p>
+                                    <p class="text-xs text-slate-500 mt-1">Please try refreshing the page.</p>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+            }, 200);
+        }
+    } catch (error) {
+        if (window.logError) window.logError('Error loading products:', error);
+        document.getElementById('productsContainer').innerHTML = `
+            <div class="col-span-full">
+                <div class="bg-red-50 rounded-lg border border-red-200 p-6 text-center">
+                    <p class="text-red-700">Error loading products. Please refresh the page.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+async function loadStores() {
+    try {
+        const response = await fetch('/api/stores', { credentials: 'include' });
+        const stores = await response.json();
+        const select = document.getElementById('storeId');
+        select.innerHTML = '<option value="">Select a store</option>' + stores.map(store => 
+            `<option value="${store.id}">${store.name}</option>`
+        ).join('');
+    } catch (error) {
+        if (window.logError) window.logError('Error loading stores:', error);
+    }
+}
+
+function openAddProductModal() {
+    loadStores();
+    document.getElementById('productModalTitle').textContent = 'Add Product';
+    document.getElementById('editProductId').value = '';
+    document.getElementById('addProductForm').reset();
+    document.getElementById('addProductModal').classList.remove('hidden');
+}
+
+async function editProduct(productId) {
+    try {
+        const response = await fetch(`/api/products/${productId}`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            await customAlert('Failed to load product details.', 'Error', 'error');
+            return;
+        }
+        
+        const product = await response.json();
+        
+        // Load stores first
+        await loadStores();
+        
+        // Populate form with product data
+        document.getElementById('productModalTitle').textContent = 'Edit Product';
+        document.getElementById('editProductId').value = product.id;
+        document.getElementById('addProductForm').querySelector('[name="storeId"]').value = product.storeId;
+        document.getElementById('addProductForm').querySelector('[name="name"]').value = product.name;
+        document.getElementById('addProductForm').querySelector('[name="sku"]').value = product.sku;
+        document.getElementById('addProductForm').querySelector('[name="category"]').value = product.category;
+        document.getElementById('addProductForm').querySelector('[name="costPrice"]').value = product.costPrice;
+        document.getElementById('addProductForm').querySelector('[name="currentPrice"]').value = product.currentPrice;
+        document.getElementById('addProductForm').querySelector('[name="salesVelocity"]').value = product.salesVelocity || 0;
+        
+        document.getElementById('addProductModal').classList.remove('hidden');
+    } catch (error) {
+        if (window.logError) window.logError('Error loading product:', error);
+        await customAlert('An error occurred while loading the product.', 'Error', 'error');
+    }
+}
+
+function closeAddProductModal() {
+    document.getElementById('addProductModal').classList.add('hidden');
+    document.getElementById('addProductForm').reset();
+    document.getElementById('editProductId').value = '';
+    document.getElementById('productModalTitle').textContent = 'Add Product';
+}
+
+document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const productId = document.getElementById('editProductId').value;
+    const isEdit = !!productId;
+    
+    // Build data object, excluding the hidden productId field
+    const data = {
+        storeId: formData.get('storeId'),
+        name: formData.get('name'),
+        sku: formData.get('sku'),
+        category: formData.get('category'),
+        costPrice: parseFloat(formData.get('costPrice')),
+        currentPrice: parseFloat(formData.get('currentPrice')),
+        salesVelocity: parseFloat(formData.get('salesVelocity')) || 0
+    };
+    
+    try {
+        const url = isEdit ? `/api/products/${productId}` : '/api/products';
+        const method = isEdit ? 'PATCH' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            closeAddProductModal();
+            await loadProducts();
+            await customAlert(
+                isEdit ? 'Product updated successfully' : 'Product added successfully',
+                'Success',
+                'success',
+                true,
+                1000
+            );
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            await customAlert(
+                errorData.error || (isEdit ? 'Failed to update product' : 'Failed to add product'),
+                'Error',
+                'error'
+            );
+        }
+    } catch (error) {
+        if (window.logError) window.logError('Error saving product:', error);
+        await customAlert(
+            isEdit ? 'An error occurred while updating the product.' : 'An error occurred while adding the product.',
+            'Error',
+            'error'
+        );
+    }
+});
+
+async function scanPrices(productId) {
+    const scanButton = document.getElementById(`scan-btn-${productId}`);
+    if (!scanButton) return;
+    
+    const scanText = scanButton.querySelector('.scan-text');
+    
+    // Disable button and show loading state
+    scanButton.disabled = true;
+    scanButton.classList.add('opacity-75', 'cursor-not-allowed');
+    scanButton.classList.remove('hover:bg-emerald-100');
+    
+    // Add spinner and update text
+    scanText.innerHTML = `
+        <svg class="animate-spin h-4 w-4 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Scanning...</span>
+    `;
+    
+    try {
+        const response = await fetch(`/api/products/${productId}/scan`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // After scanning, automatically create/update recommendation with fresh data
+            // This ensures the recommendation uses the latest market data
+            try {
+                await fetch('/api/recommendations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ productId: productId })
+                });
+            } catch (error) {
+                if (window.logError) window.logError('Error updating recommendation:', error);
+            }
+            
+            // Reload products immediately to show updated data
+            // loadProducts() will automatically restore any open analytics tabs and reload their data
+            await loadProducts();
+        } else {
+            const errorData = await response.json();
+            alert(errorData.error || 'Failed to scan prices');
+            // Re-enable button
+            scanButton.disabled = false;
+            scanButton.classList.remove('opacity-75', 'cursor-not-allowed');
+            scanButton.classList.add('hover:bg-emerald-100');
+            // Reset text - check if button still exists after reload
+            if (scanText) {
+                scanText.innerHTML = 'Scan Prices';
+            }
+        }
+    } catch (error) {
+        alert('Error scanning prices');
+        // Re-enable button
+        scanButton.disabled = false;
+        scanButton.classList.remove('opacity-75', 'cursor-not-allowed');
+        scanButton.classList.add('hover:bg-emerald-100');
+        // Reset text - check if button still exists after reload
+        if (scanText) {
+            scanText.innerHTML = 'Scan Prices';
+        }
+    }
+}
+
+async function deleteProduct(productId) {
+    if (!productId) {
+        if (window.logError) window.logError('Delete product: No product ID provided');
+        await customAlert('Error: Product ID is missing.', 'Error', 'error');
+        return;
+    }
+    
+    const confirmed = await customConfirm(
+        'Are you sure you want to delete this product? This action cannot be undone.',
+        'Delete Product'
+    );
+    
+    if (!confirmed) {
+        return;
+    }
+    
+    // Find the product card and add loading state
+    const productCard = document.querySelector(`[data-product-id="${productId}"]`);
+    if (productCard) {
+        productCard.style.opacity = '0.5';
+        productCard.style.pointerEvents = 'none';
+    }
+    
+    try {
+        const response = await fetch(`/api/products/${productId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+        
+        let responseData = {};
+        try {
+            const text = await response.text();
+            responseData = text ? JSON.parse(text) : {};
+        } catch (e) {
+            // Response might not be JSON
+            if (window.logError) window.logError('Error parsing delete response:', e);
+        }
+        
+        if (response.ok) {
+            // Remove the product card with animation
+            if (productCard) {
+                productCard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                productCard.style.opacity = '0';
+                productCard.style.transform = 'translateX(-20px)';
+                setTimeout(() => {
+                    productCard.remove();
+                }, 300);
+            }
+            
+            // Reload products to ensure consistency
+            setTimeout(async () => {
+                await loadProducts();
+                // Show auto-dismissing success message
+                await customAlert('Product deleted successfully', 'Success', 'success', true, 1000);
+            }, 350);
+        } else {
+            // Restore product card if deletion failed
+            if (productCard) {
+                productCard.style.opacity = '1';
+                productCard.style.pointerEvents = 'auto';
+            }
+            const errorMsg = responseData.error || 'Failed to delete product. Please try again.';
+            await customAlert(errorMsg, 'Error', 'error');
+        }
+    } catch (error) {
+        if (window.logError) window.logError('Error deleting product:', error);
+        // Restore product card if error occurred
+        if (productCard) {
+            productCard.style.opacity = '1';
+            productCard.style.pointerEvents = 'auto';
+        }
+        await customAlert('An error occurred while deleting the product. Please try again.', 'Error', 'error');
+    }
+}
+
+async function applyRecommendation(recId, price, productId) {
+    const confirmed = await customConfirm(
+        `Apply this recommendation and update the product price to $${price.toFixed(2)}?`,
+        'Apply Price Recommendation'
+    );
+    if (!confirmed) return;
+    
+    // Find and remove the recommendation section immediately
+    const productCard = document.querySelector(`[data-product-id="${productId}"]`);
+    let recommendationSection = null;
+    if (productCard) {
+        recommendationSection = productCard.querySelector('.recommendation-section');
+        if (recommendationSection) {
+            // Add fade-out animation
+            recommendationSection.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out, margin 0.3s ease-out, padding 0.3s ease-out, max-height 0.3s ease-out';
+            recommendationSection.style.opacity = '0';
+            recommendationSection.style.transform = 'translateY(-10px)';
+            recommendationSection.style.marginBottom = '0';
+            recommendationSection.style.marginTop = '0';
+            recommendationSection.style.paddingTop = '0';
+            recommendationSection.style.paddingBottom = '0';
+            recommendationSection.style.maxHeight = '0';
+            recommendationSection.style.overflow = 'hidden';
+            recommendationSection.style.borderWidth = '0';
+            
+            // Remove from DOM after animation
+            setTimeout(() => {
+                if (recommendationSection && recommendationSection.parentNode) {
+                    recommendationSection.remove();
+                }
+            }, 300);
+        }
+    }
+    
+    try {
+        const response = await fetch(`/api/recommendations/${recId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ status: 'applied', applyPrice: true })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            // Verify the recommendation was actually applied
+            if (result.status === 'applied') {
+                // Check if analytics are currently open for this product
+                const analyticsDiv = document.getElementById(`analytics-${productId}`);
+                const isAnalyticsOpen = analyticsDiv && !analyticsDiv.classList.contains('hidden');
+                
+                // Wait for animation to complete, then reload
+                setTimeout(async () => {
+                    await loadProducts();
+                    
+                    // If analytics were open, reload elasticity curve with applied recommendation
+                    if (isAnalyticsOpen) {
+                        setTimeout(async () => {
+                            // Clear and reload elasticity curve to show it with applied recommendation
+                            if (chartInstances[`elasticity-${productId}`]) {
+                                try {
+                                    chartInstances[`elasticity-${productId}`].destroy();
+                                } catch (e) {
+                                    if (window.logError) window.logError('Error destroying elasticity chart:', e);
+                                }
+                                delete chartInstances[`elasticity-${productId}`];
+                            }
+                            await loadElasticityCurveForProduct(productId);
+                        }, 300);
+                    }
+                    
+                    // Refresh dashboard recommendations if we're on the dashboard
+                    if (window.location.pathname === '/dashboard' || window.location.pathname === '/') {
+                        if (typeof loadRecommendations === 'function') {
+                            loadRecommendations();
+                        }
+                    }
+                    // Show success message after reload
+                    setTimeout(() => {
+                        customAlert(`Price updated successfully to $${price.toFixed(2)}`, 'Success', 'success', true, 1000);
+                    }, 100);
+                }, 400);
+            } else {
+                // Status didn't change, reload to check
+                await loadProducts();
+                await customAlert('Failed to apply recommendation. Please try again.', 'Error', 'error');
+            }
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            // If failed, reload to restore the recommendation
+            await loadProducts();
+            await customAlert(errorData.error || 'Failed to apply recommendation. Please try again.', 'Error', 'error');
+        }
+    } catch (error) {
+        if (window.logError) window.logError('Error applying recommendation:', error);
+        // If error, reload to restore the recommendation
+        await loadProducts();
+        await customAlert('An error occurred while applying the recommendation.', 'Error', 'error');
+    }
+}
+
+async function rejectRecommendation(recId, productId) {
+    const confirmed = await customConfirm(
+        'Are you sure you want to dismiss this recommendation?',
+        'Dismiss Recommendation'
+    );
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`/api/recommendations/${recId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ status: 'rejected' })
+        });
+        
+        if (response.ok) {
+            loadProducts();
+        } else {
+            await customAlert('Failed to dismiss recommendation. Please try again.', 'Error', 'error');
+        }
+    } catch (error) {
+        if (window.logError) window.logError('Error rejecting recommendation:', error);
+        await customAlert('An error occurred while dismissing the recommendation.', 'Error', 'error');
+    }
+}
+
+// Price Analytics Functions
+const chartInstances = {};
+
+async function togglePriceAnalytics(productId) {
+    const analyticsDiv = document.getElementById(`analytics-${productId}`);
+    const toggleText = document.getElementById(`analytics-toggle-${productId}`);
+    
+    if (!analyticsDiv || !toggleText) {
+        if (window.logError) window.logError('Analytics elements not found for product:', productId);
+        return;
+    }
+    
+    if (analyticsDiv.classList.contains('hidden')) {
+        // Show analytics
+        analyticsDiv.classList.remove('hidden');
+        toggleText.textContent = 'Hide Price Analytics';
+        
+        // Check if Chart.js is available
+        if (typeof Chart === 'undefined') {
+            if (window.logError) window.logError('Chart.js is not loaded');
+            analyticsDiv.innerHTML = `
+                <div class="text-center py-4 text-sm text-red-600">
+                    <p>Chart library not loaded. Please refresh the page.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Load and render charts if not already loaded
+        if (!chartInstances[productId]) {
+            await loadPriceAnalytics(productId);
+        }
+    } else {
+        // Hide analytics
+        analyticsDiv.classList.add('hidden');
+        toggleText.textContent = 'View Price Analytics';
+    }
+}
+
+async function loadPriceAnalytics(productId) {
+    const analyticsDiv = document.getElementById(`analytics-${productId}`);
+    if (!analyticsDiv) {
+        if (window.logError) window.logError('Analytics div not found for product:', productId);
+        return;
+    }
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        analyticsDiv.innerHTML = `
+            <div class="text-center py-4 text-sm text-red-600">
+                <p>Chart library not loaded. Please refresh the page.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Show loading state
+    analyticsDiv.innerHTML = `
+        <div class="text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+            <p class="text-sm text-slate-500 mt-2">Loading analytics...</p>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch(`/api/products/${productId}/market-data`, {
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to load market data');
+        }
+        
+        const data = await response.json();
+        
+        // Validate data
+        if (!data) {
+            throw new Error('No data received from server');
+        }
+        
+        // Restore the original structure with data info
+        const dataInfo = data.scanSessions ? 
+            `${data.totalDataPoints} prices from ${data.scanSessions} scan${data.scanSessions !== 1 ? 's' : ''}` : 
+            `${data.totalDataPoints} price${data.totalDataPoints !== 1 ? 's' : ''} found`;
+        
+        analyticsDiv.innerHTML = `
+            <div class="space-y-4">
+                <div class="text-xs text-slate-500 mb-2">
+                    <p>Data from: ${data.dataSource || 'Scraped market prices'}</p>
+                    <p>${dataInfo}</p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-900 mb-2">Price Trend Over Time</h4>
+                    <p class="text-xs text-slate-500 mb-2">Shows market price averages from each scan session</p>
+                    <canvas id="trend-chart-${productId}" class="w-full" style="max-height: 200px;"></canvas>
+                </div>
+                <div>
+                    <h4 class="text-sm font-semibold text-slate-900 mb-2">Market Price Distribution</h4>
+                    <p class="text-xs text-slate-500 mb-2">Distribution of competitor prices ${data.scanSessions > 1 ? 'from most recent scan' : 'from current scan'}</p>
+                    <canvas id="distribution-chart-${productId}" class="w-full" style="max-height: 150px;"></canvas>
+                </div>
+                <div id="elasticity-section-${productId}">
+                    <!-- Elasticity curve will be loaded here if recommendation exists -->
+                </div>
+            </div>
+        `;
+        
+        // Wait a bit for DOM to update before rendering charts
+        setTimeout(() => {
+            try {
+                // Render price trend chart
+                if (data.trend && Array.isArray(data.trend) && data.trend.length > 0) {
+                    renderTrendChart(productId, data.trend, data.productPrice);
+                } else {
+                    const trendDiv = analyticsDiv.querySelector(`#trend-chart-${productId}`)?.parentElement;
+                    if (trendDiv) {
+                        trendDiv.innerHTML = '<p class="text-xs text-slate-500">No trend data available yet. Scan prices to see trends.</p>';
+                    }
+                }
+                
+                // Render distribution chart
+                if (data.currentDistribution && Array.isArray(data.currentDistribution) && data.currentDistribution.length > 0) {
+                    renderDistributionChart(productId, data.currentDistribution, data.productPrice);
+                } else {
+                    const distDiv = analyticsDiv.querySelector(`#distribution-chart-${productId}`)?.parentElement;
+                    if (distDiv) {
+                        distDiv.innerHTML = '<p class="text-xs text-slate-500">No recent market data available. Scan prices to see distribution.</p>';
+                    }
+                }
+                
+                // Load elasticity curve lazily (only if recommendation exists)
+                // Use a delay to avoid blocking the main charts and allow recommendation to be created
+                setTimeout(() => {
+                    loadElasticityCurveForProduct(productId);
+                }, 400);
+            } catch (error) {
+                if (window.logError) window.logError('Error rendering charts:', error);
+                analyticsDiv.innerHTML = `
+                    <div class="text-center py-4 text-sm text-red-600">
+                        <p>Error rendering charts: ${error.message || 'Unknown error'}</p>
+                        <p class="text-xs text-slate-500 mt-1">Please try refreshing the page.</p>
+                    </div>
+                `;
+            }
+        }, 150);
+        
+    } catch (error) {
+        if (window.logError) window.logError('Error loading price analytics:', error);
+        analyticsDiv.innerHTML = `
+            <div class="text-center py-4 text-sm text-red-600">
+                <p>Unable to load price analytics: ${error.message || 'Unknown error'}</p>
+                <p class="text-xs text-slate-500 mt-1">Please try again or scan prices first.</p>
+            </div>
+        `;
+    }
+}
+
+function renderTrendChart(productId, trendData, currentPrice) {
+    const canvas = document.getElementById(`trend-chart-${productId}`);
+    if (!canvas) {
+        if (window.logError) window.logError('Trend chart canvas not found for product:', productId);
+        return;
+    }
+    
+    if (!trendData || trendData.length === 0) {
+        canvas.parentElement.innerHTML = `
+            <div class="text-center py-4 text-sm text-slate-500">
+                <p>No trend data available yet. Scan prices to see trends.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    if (typeof Chart === 'undefined') {
+        if (window.logError) window.logError('Chart.js is not available');
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (chartInstances[productId]?.trend) {
+        chartInstances[productId].trend.destroy();
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    const labels = trendData.map((d, index) => {
+        if (d.timestamp) {
+            // Parse the UTC timestamp - new Date() automatically converts to user's local timezone
+            // Ensure the timestamp string is properly formatted (should end with Z or have timezone)
+            let timestampStr = d.timestamp;
+            if (!timestampStr.endsWith('Z') && !timestampStr.includes('+') && !timestampStr.includes('-', 10)) {
+                // If no timezone indicator, assume UTC and append Z
+                timestampStr = timestampStr.endsWith('Z') ? timestampStr : timestampStr + 'Z';
+            }
+            
+            const date = new Date(timestampStr);
+            
+            // Use toLocaleString without timeZone parameter - it uses user's local timezone by default
+            return date.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        } else {
+            // Fallback for date-only format
+            const date = new Date(d.date + 'T00:00:00Z'); // Treat as UTC midnight
+            return date.toLocaleString('en-US', { 
+                month: 'short', 
+                day: 'numeric'
+            });
+        }
+    });
+    
+    chartInstances[productId] = chartInstances[productId] || {};
+    chartInstances[productId].trend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Market Average',
+                    data: trendData.map(d => d.average),
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Market Min',
+                    data: trendData.map(d => d.min),
+                    borderColor: 'rgb(251, 191, 36)',
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    tension: 0.4,
+                    borderDash: [5, 5],
+                    fill: false
+                },
+                {
+                    label: 'Market Max',
+                    data: trendData.map(d => d.max),
+                    borderColor: 'rgb(251, 191, 36)',
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    tension: 0.4,
+                    borderDash: [5, 5],
+                    fill: false
+                },
+                {
+                    label: 'Your Price',
+                    data: Array(labels.length).fill(currentPrice),
+                    borderColor: 'rgb(239, 68, 68)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 2,
+                    borderDash: [10, 5],
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 10,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        title: function(context) {
+                            // Show the full date/time in user's timezone in tooltip
+                            const dataIndex = context[0].dataIndex;
+                            const trendPoint = trendData[dataIndex];
+                            if (trendPoint && trendPoint.timestamp) {
+                                let timestampStr = trendPoint.timestamp;
+                                // Ensure proper UTC format
+                                if (!timestampStr.endsWith('Z') && !timestampStr.includes('+') && !timestampStr.includes('-', 10)) {
+                                    timestampStr = timestampStr.endsWith('Z') ? timestampStr : timestampStr + 'Z';
+                                }
+                                const date = new Date(timestampStr);
+                                // new Date() automatically converts UTC to local timezone
+                                return date.toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                });
+                            }
+                            return context[0].label;
+                        },
+                        label: function(context) {
+                            return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        },
+                        font: {
+                            size: 10
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 10
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderDistributionChart(productId, prices, currentPrice) {
+    const canvas = document.getElementById(`distribution-chart-${productId}`);
+    if (!canvas) {
+        if (window.logError) window.logError('Distribution chart canvas not found for product:', productId);
+        return;
+    }
+    
+    if (!prices || prices.length === 0) {
+        canvas.parentElement.innerHTML = `
+            <div class="text-center py-4 text-sm text-slate-500">
+                <p>No recent market data available. Scan prices to see distribution.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    if (typeof Chart === 'undefined') {
+        if (window.logError) window.logError('Chart.js is not available');
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (chartInstances[productId]?.distribution) {
+        chartInstances[productId].distribution.destroy();
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Create price bins for histogram
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const range = maxPrice - minPrice;
+    const binCount = Math.min(10, Math.max(5, Math.floor(prices.length / 5)));
+    const binSize = range / binCount;
+    
+    const bins = Array(binCount).fill(0);
+    const binLabels = [];
+    
+    for (let i = 0; i < binCount; i++) {
+        const binStart = minPrice + (i * binSize);
+        const binEnd = binStart + binSize;
+        binLabels.push(`$${binStart.toFixed(0)}-${binEnd.toFixed(0)}`);
+        
+        bins[i] = prices.filter(p => p >= binStart && (i === binCount - 1 ? p <= binEnd : p < binEnd)).length;
+    }
+    
+    // Find which bin current price falls into
+    const currentPriceBin = Math.min(
+        binCount - 1,
+        Math.floor((currentPrice - minPrice) / binSize)
+    );
+    
+    const backgroundColors = binLabels.map((_, i) => {
+        if (i === currentPriceBin) {
+            return 'rgba(239, 68, 68, 0.6)'; // Red for your price
+        }
+        return 'rgba(16, 185, 129, 0.6)'; // Green for market prices
+    });
+    
+    chartInstances[productId] = chartInstances[productId] || {};
+    chartInstances[productId].distribution = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: binLabels,
+            datasets: [{
+                label: 'Price Frequency',
+                data: bins,
+                backgroundColor: backgroundColors,
+                borderColor: 'rgb(16, 185, 129)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y + ' price' + (context.parsed.y !== 1 ? 's' : '') + ' in this range';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        font: {
+                            size: 10
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 9
+                        },
+                        maxRotation: 45,
+                        minRotation: 45
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Load elasticity curve for a product (if recommendation exists)
+async function loadElasticityCurveForProduct(productId) {
+    const elasticitySection = document.getElementById(`elasticity-section-${productId}`);
+    if (!elasticitySection) {
+        if (window.logError) window.logError('Elasticity section not found for product:', productId);
+        return;
+    }
+    
+    // Clear any existing chart instance to force reload
+    if (chartInstances[`elasticity-${productId}`]) {
+        try {
+            chartInstances[`elasticity-${productId}`].destroy();
+        } catch (e) {
+            if (window.logError) window.logError('Error destroying elasticity chart:', e);
+        }
+        delete chartInstances[`elasticity-${productId}`];
+    }
+    
+    try {
+        // First, check if there's a recommendation (pending or applied) for this product
+        // We check for both to show elasticity curve even after applying
+        const recResponse = await fetch(`/api/recommendations?productId=${productId}`, {
+            credentials: 'include'
+        });
+        
+        if (!recResponse.ok) {
+            // Clear section if no recommendation
+            elasticitySection.innerHTML = '';
+            return;
+        }
+        
+        const recommendations = await recResponse.json();
+        // Prefer pending recommendation, but also show applied ones
+        let recommendation = recommendations.find(rec => rec.status === 'pending');
+        if (!recommendation) {
+            // If no pending, get the most recent applied recommendation
+            const appliedRecs = recommendations.filter(rec => rec.status === 'applied');
+            if (appliedRecs.length > 0) {
+                // Sort by created_at or id to get most recent
+                appliedRecs.sort((a, b) => {
+                    const dateA = a.createdAt ? new Date(a.createdAt) : new Date(a.id);
+                    const dateB = b.createdAt ? new Date(b.createdAt) : new Date(b.id);
+                    return dateB - dateA;
+                });
+                recommendation = appliedRecs[0];
+            }
+        }
+        
+        if (!recommendation) {
+            // Clear section if no recommendation at all
+            elasticitySection.innerHTML = '';
+            return;
+        }
+        
+        // Show loading state
+        elasticitySection.innerHTML = `
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                <div class="text-center py-2">
+                    <div class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <p class="text-xs text-slate-500 mt-1">Loading elasticity curve...</p>
+                </div>
+            </div>
+        `;
+        
+        // Fetch elasticity curve data
+        const elasticityResponse = await fetch(`/api/recommendations/${recommendation.id}/elasticity`, {
+            credentials: 'include'
+        });
+        
+        if (!elasticityResponse.ok) {
+            const errorData = await elasticityResponse.json().catch(() => ({}));
+            elasticitySection.innerHTML = `
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                    <p class="text-xs text-slate-500">Unable to load elasticity curve: ${errorData.error || 'Unknown error'}</p>
+                </div>
+            `;
+            if (window.logError) window.logError('Failed to load elasticity data:', errorData.error || elasticityResponse.status);
+            return;
+        }
+        
+        const data = await elasticityResponse.json();
+        
+        if (!data || !data.curve || !Array.isArray(data.curve) || data.curve.length === 0) {
+            elasticitySection.innerHTML = `
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                    <p class="text-xs text-slate-500">No elasticity data available</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const canvas = document.createElement('canvas');
+        canvas.id = `elasticity-chart-${productId}`;
+        canvas.className = 'w-full';
+        canvas.style.maxHeight = '300px';
+        
+        elasticitySection.innerHTML = `
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                <div class="mb-3">
+                    <h4 class="text-sm font-semibold text-slate-900 mb-1">Price Impact on Sales</h4>
+                    <p class="text-xs text-slate-600">See how changing your price affects expected sales volume</p>
+                </div>
+                ${canvas.outerHTML}
+                <div id="elasticity-info-${productId}" class="mt-3 text-xs text-slate-600">
+                    <!-- Info will be loaded here -->
+                </div>
+            </div>
+        `;
+        
+        // Wait for DOM to update
+        setTimeout(() => {
+            try {
+                renderElasticityChart(productId, data);
+            } catch (error) {
+                if (window.logError) window.logError('Error rendering elasticity chart:', error);
+                elasticitySection.innerHTML = `
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                        <p class="text-xs text-red-600">Error rendering elasticity curve: ${error.message || 'Unknown error'}</p>
+                    </div>
+                `;
+            }
+        }, 150);
+        
+    } catch (error) {
+        if (window.logError) window.logError('Error loading elasticity curve:', error);
+        elasticitySection.innerHTML = `
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                <p class="text-xs text-red-600">Error loading elasticity curve: ${error.message || 'Unknown error'}</p>
+            </div>
+        `;
+    }
+}
+
+// Render elasticity chart
+function renderElasticityChart(productId, data) {
+    const canvas = document.getElementById(`elasticity-chart-${productId}`);
+    const infoDiv = document.getElementById(`elasticity-info-${productId}`);
+    
+    if (!canvas) {
+        if (window.logError) window.logError('Elasticity chart canvas not found for product:', productId);
+        return;
+    }
+    
+    if (typeof Chart === 'undefined') {
+        if (window.logError) window.logError('Chart.js is not available for elasticity chart');
+        return;
+    }
+    
+    if (!data || !data.curve || !Array.isArray(data.curve) || data.curve.length === 0) {
+        if (window.logError) window.logError('Invalid elasticity data for product:', productId);
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (chartInstances[`elasticity-${productId}`]) {
+        chartInstances[`elasticity-${productId}`].destroy();
+        delete chartInstances[`elasticity-${productId}`];
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Extract data points
+    const prices = data.curve.map(point => point.price);
+    const demands = data.curve.map(point => point.demand);
+    const revenues = data.curve.map(point => point.revenue || (point.demand * point.price));
+    const profits = data.curve.map(point => point.profit || (point.demand * (point.price - (data.costPrice || 0))));
+    
+    // Find closest indices for current, suggested, and optimal prices
+    let currentPriceIndex = -1;
+    let suggestedPriceIndex = -1;
+    let optimalPriceIndex = -1;
+    let minCurrentDiff = Infinity;
+    let minSuggestedDiff = Infinity;
+    let minOptimalDiff = Infinity;
+    
+    prices.forEach((p, i) => {
+        const currentDiff = Math.abs(p - data.currentPrice);
+        const suggestedDiff = Math.abs(p - data.suggestedPrice);
+        const optimalDiff = data.optimalPrice ? Math.abs(p - data.optimalPrice) : Infinity;
+        
+        if (currentDiff < minCurrentDiff) {
+            minCurrentDiff = currentDiff;
+            currentPriceIndex = i;
+        }
+        if (suggestedDiff < minSuggestedDiff) {
+            minSuggestedDiff = suggestedDiff;
+            suggestedPriceIndex = i;
+        }
+        if (optimalDiff < minOptimalDiff) {
+            minOptimalDiff = optimalDiff;
+            optimalPriceIndex = i;
+        }
+    });
+    
+    // Create arrays for marker points
+    const currentPriceData = Array(prices.length).fill(null);
+    const suggestedPriceData = Array(prices.length).fill(null);
+    const optimalPriceData = Array(prices.length).fill(null);
+    
+    if (currentPriceIndex >= 0) {
+        currentPriceData[currentPriceIndex] = data.currentDemand;
+    }
+    if (suggestedPriceIndex >= 0) {
+        suggestedPriceData[suggestedPriceIndex] = data.suggestedDemand;
+    }
+    if (optimalPriceIndex >= 0 && data.optimalPrice) {
+        optimalPriceData[optimalPriceIndex] = data.optimalDemand || demands[optimalPriceIndex];
+    }
+    
+    // Create chart
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: prices.map(p => `$${p.toFixed(2)}`),
+            datasets: [
+                {
+                    label: 'Expected Sales',
+                    data: demands,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Current Price',
+                    data: currentPriceData,
+                    borderColor: 'rgb(239, 68, 68)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    showLine: false,
+                    pointStyle: 'circle'
+                },
+                {
+                    label: 'Suggested Price',
+                    data: suggestedPriceData,
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    showLine: false,
+                    pointStyle: 'circle'
+                },
+                {
+                    label: 'Optimal Price (Max Profit)',
+                    data: optimalPriceData,
+                    borderColor: 'rgb(168, 85, 247)',
+                    backgroundColor: 'rgba(168, 85, 247, 0.8)',
+                    pointRadius: 7,
+                    pointHoverRadius: 9,
+                    showLine: false,
+                    pointStyle: 'star',
+                    pointRotation: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return `Price: ${context[0].label}`;
+                        },
+                        label: function(context) {
+                            const pointIndex = context.dataIndex;
+                            const point = data.curve[pointIndex];
+                            
+                            if (context.datasetIndex === 0) {
+                                // Main demand curve
+                                const revenue = point?.revenue || (point?.demand * point?.price);
+                                const profit = point?.profit || (point?.demand * (point?.price - (data.costPrice || 0)));
+                                return [
+                                    `Expected Sales: ${context.parsed.y.toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'}`,
+                                    `Revenue: $${revenue.toFixed(2)}`,
+                                    `Profit: $${profit.toFixed(2)}`
+                                ];
+                            } else if (context.datasetIndex === 1) {
+                                return `Current Price: ${data.currentDemand.toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'} sales`;
+                            } else if (context.datasetIndex === 2) {
+                                return `Suggested Price: ${data.suggestedDemand.toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'} sales`;
+                            } else if (context.datasetIndex === 3) {
+                                return `Optimal Price: ${(data.optimalDemand || 0).toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'} sales (Max Profit)`;
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: data.baseDemand >= 10 ? 'Expected Sales (units)' : 'Expected Sales (%)',
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        },
+                        color: 'rgb(71, 85, 105)'
+                    },
+                    ticks: {
+                        font: {
+                            size: 11
+                        },
+                        color: 'rgb(71, 85, 105)'
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Price ($)',
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        },
+                        color: 'rgb(71, 85, 105)'
+                    },
+                    ticks: {
+                        font: {
+                            size: 10
+                        },
+                        color: 'rgb(71, 85, 105)',
+                        maxRotation: 45,
+                        minRotation: 45,
+                        callback: function(value, index) {
+                            // Show every 4th label to avoid crowding
+                            return index % 4 === 0 ? this.getLabelForValue(value) : '';
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+    
+    // Store chart instance and mark as loaded
+    chartInstances[`elasticity-${productId}`] = chart;
+    chartInstances[`elasticity-${productId}`]._loaded = true;
+    
+    // Calculate insights
+    const revenueChangeText = data.revenueChange >= 0 ? 
+        `+$${Math.abs(data.revenueChange).toFixed(2)}` : 
+        `-$${Math.abs(data.revenueChange).toFixed(2)}`;
+    const revenueChangeColor = data.revenueChange >= 0 ? 'text-emerald-600' : 'text-red-600';
+    
+    const profitChangeText = data.profitChange >= 0 ? 
+        `+$${Math.abs(data.profitChange).toFixed(2)}` : 
+        `-$${Math.abs(data.profitChange).toFixed(2)}`;
+    const profitChangeColor = data.profitChange >= 0 ? 'text-emerald-600' : 'text-red-600';
+    
+    const demandChangeText = data.demandChange >= 0 ? 
+        `+${data.demandChange.toFixed(1)}` : 
+        data.demandChange.toFixed(1);
+    const demandChangeColor = data.demandChange >= 0 ? 'text-emerald-600' : 'text-amber-600';
+    
+    // Determine insight message
+    let insightMessage = '';
+    let insightColor = 'text-slate-600';
+    if (data.profitChange > 0 && data.revenueChange > 0) {
+        insightMessage = '✓ Price change increases both revenue and profit';
+        insightColor = 'text-emerald-600';
+    } else if (data.profitChange > 0) {
+        insightMessage = '✓ Price change increases profit despite lower revenue';
+        insightColor = 'text-emerald-600';
+    } else if (data.revenueChange > 0 && data.profitChange < 0) {
+        insightMessage = '⚠ Revenue increases but profit decreases';
+        insightColor = 'text-amber-600';
+    } else {
+        insightMessage = '⚠ Price change reduces both revenue and profit';
+        insightColor = 'text-red-600';
+    }
+    
+    if (infoDiv) {
+        infoDiv.innerHTML = `
+            <div class="space-y-3 mt-3">
+                <!-- Key Metrics Comparison -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white rounded-lg p-3 border border-slate-200">
+                        <div class="text-xs text-slate-500 mb-1">Current Price</div>
+                        <div class="text-lg font-bold text-slate-900">$${data.currentPrice.toFixed(2)}</div>
+                        <div class="mt-2 space-y-1">
+                            <div class="text-xs text-slate-600">
+                                <span class="font-medium">Sales:</span> ${data.currentDemand.toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'}
+                            </div>
+                            <div class="text-xs text-slate-600">
+                                <span class="font-medium">Revenue:</span> $${(data.currentRevenue || 0).toFixed(2)}
+                            </div>
+                            <div class="text-xs text-slate-600">
+                                <span class="font-medium">Profit:</span> $${(data.currentProfit || 0).toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+                        <div class="text-xs text-slate-500 mb-1">Suggested Price</div>
+                        <div class="text-lg font-bold text-emerald-700">$${data.suggestedPrice.toFixed(2)}</div>
+                        <div class="mt-2 space-y-1">
+                            <div class="text-xs text-slate-600">
+                                <span class="font-medium">Sales:</span> ${data.suggestedDemand.toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'}
+                            </div>
+                            <div class="text-xs text-slate-600">
+                                <span class="font-medium">Revenue:</span> $${(data.suggestedRevenue || 0).toFixed(2)}
+                            </div>
+                            <div class="text-xs text-slate-600">
+                                <span class="font-medium">Profit:</span> $${(data.suggestedProfit || 0).toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Impact Analysis -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                    <div class="text-xs font-semibold text-slate-700 mb-2">Impact Analysis</div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <div class="text-xs text-slate-500">Sales Change</div>
+                            <div class="text-sm font-semibold ${demandChangeColor}">
+                                ${demandChangeText}${data.baseDemand >= 10 ? ' units' : '%'}
+                            </div>
+                            <div class="text-xs text-slate-500">${data.demandChangePercent >= 0 ? '+' : ''}${data.demandChangePercent.toFixed(1)}%</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-500">Revenue Change</div>
+                            <div class="text-sm font-semibold ${revenueChangeColor}">
+                                ${revenueChangeText}
+                            </div>
+                            <div class="text-xs text-slate-500">${data.revenueChangePercent >= 0 ? '+' : ''}${data.revenueChangePercent.toFixed(1)}%</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-slate-500">Profit Change</div>
+                            <div class="text-sm font-semibold ${profitChangeColor}">
+                                ${profitChangeText}
+                            </div>
+                            <div class="text-xs text-slate-500">${data.profitChangePercent >= 0 ? '+' : ''}${data.profitChangePercent.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Optimal Price Insight -->
+                ${data.optimalPrice && Math.abs(data.optimalPrice - data.suggestedPrice) > 0.01 ? `
+                <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                    <div class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <div class="text-xs font-semibold text-purple-900 mb-1">Optimal Price Point</div>
+                            <div class="text-sm text-purple-700 font-medium">$${data.optimalPrice.toFixed(2)}</div>
+                            <div class="text-xs text-purple-600 mt-1">
+                                Maximum profit of $${(data.optimalProfit || 0).toFixed(2)} at ${(data.optimalDemand || 0).toFixed(1)}${data.baseDemand >= 10 ? ' units' : '%'} sales
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- Key Insight -->
+                <div class="bg-white rounded-lg p-3 border border-slate-200">
+                    <div class="flex items-start gap-2">
+                        <svg class="w-4 h-4 ${insightColor.includes('emerald') ? 'text-emerald-600' : insightColor.includes('amber') ? 'text-amber-600' : 'text-red-600'} mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="flex-1">
+                            <div class="text-xs font-semibold ${insightColor} mb-1">Key Insight</div>
+                            <div class="text-xs ${insightColor}">
+                                ${insightMessage}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+loadProducts();
+</script>
+{% endblock %}

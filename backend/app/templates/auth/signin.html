@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - OptimaPricer{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-lg shadow-sm border border-slate-200">
+        <div class="p-6 space-y-1 text-center">
+            <div class="flex justify-center mb-4">
+                <div class="flex items-center gap-2 text-emerald-900 font-bold text-2xl">
+                    <img src="{{ url_for('static', filename='logo.svg') }}" alt="OptimaPricer Logo" class="w-12 h-12">
+                    <span class="flex items-baseline gap-1.5">
+                        <span>Optima</span>
+                        <span class="text-xs font-normal relative top-1">
+                            <span class="text-slate-500">by </span><a href="https://www.agenscience.ai/" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:text-emerald-900 transition-colors no-underline">Agenscience.ai</a>
+                        </span>
+                    </span>
+                </div>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900">Sign in to your account</h2>
+            <p class="text-slate-500 text-sm">Enter your email and password to access your pricing dashboard</p>
+        </div>
+        <div class="p-6">
+            <form id="signinForm" class="space-y-4">
+                <div id="errorMessage" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded"></div>
+                <div class="space-y-2">
+                    <label for="email" class="block text-sm font-medium text-slate-700">Email</label>
+                    <input type="email" id="email" name="email" required
+                        class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+                        placeholder="you@example.com">
+                </div>
+                <div class="space-y-2">
+                    <label for="password" class="block text-sm font-medium text-slate-700">Password</label>
+                    <input type="password" id="password" name="password" required
+                        class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500">
+                </div>
+                <button type="submit" id="submitBtn"
+                    class="w-full bg-emerald-900 hover:bg-emerald-800 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="submitText">Sign In</span>
+                    <span id="submitLoading" class="hidden">Signing in...</span>
+                </button>
+            </form>
+            <div class="mt-4 text-center text-sm">
+                <span class="text-slate-600">Don't have an account? </span>
+                <a href="{{ url_for('main.register') }}" class="text-emerald-600 hover:underline">Sign up</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('signinForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('submitBtn');
+    const submitText = document.getElementById('submitText');
+    const submitLoading = document.getElementById('submitLoading');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    submitBtn.disabled = true;
+    submitText.classList.add('hidden');
+    submitLoading.classList.remove('hidden');
+    errorMessage.classList.add('hidden');
+    
+    const formData = new FormData(e.target);
+    const data = {
+        email: formData.get('email'),
+        password: formData.get('password')
+    };
+    
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            window.location.href = '/';
+        } else {
+            errorMessage.textContent = result.error || 'Invalid email or password';
+            errorMessage.classList.remove('hidden');
+        }
+    } catch (error) {
+        errorMessage.textContent = 'An error occurred. Please try again.';
+        errorMessage.classList.remove('hidden');
+    } finally {
+        submitBtn.disabled = false;
+        submitText.classList.remove('hidden');
+        submitLoading.classList.add('hidden');
+    }
+});
+</script>
+{% endblock %}
