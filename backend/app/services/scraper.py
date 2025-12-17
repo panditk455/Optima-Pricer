@@ -53,6 +53,10 @@ class MarketDataScraper:
                 import platform
                 
                 chrome_options = Options()
+                chrome_bin = os.getenv("CHROME_BIN")
+                if chrome_bin:
+                    chrome_options.binary_location = chrome_bin
+
                 chrome_options.add_argument('--headless=new')
                 chrome_options.add_argument('--no-sandbox')
                 chrome_options.add_argument('--disable-dev-shm-usage')
@@ -72,7 +76,15 @@ class MarketDataScraper:
                 
                 # Try to install and use ChromeDriver
                 try:
-                    driver_path = ChromeDriverManager().install()
+                    driver_env = os.getenv("CHROMEDRIVER")
+                    
+                    if driver_env and os.path.exists(driver_env):
+                        service = Service(driver_env)
+                        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                    else:
+                        driver_path = ChromeDriverManager().install()
+                    
+        
                     print(f'[Scraper] ChromeDriver path: {driver_path}')
                     
                     # Make sure it's executable
